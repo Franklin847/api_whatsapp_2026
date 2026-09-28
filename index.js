@@ -31,18 +31,10 @@ process.on('unhandledRejection', (reason, promise) => {
 
 var sesion_activa = 'N';
 
-// verificamos si la session ya fue guardada con fs
-const SESSION_FILE_PATH = './session.json';
-let sessionData;
-
-if (fs.existsSync(SESSION_FILE_PATH)) {
-    sessionData = require(SESSION_FILE_PATH);
-}
-
 // Uso de valores guardados
 const client = new Client({
     authStrategy: new LocalAuth({
-        clientId: "client-one", qrTimeoutMs: 0, userDataDir: sessionData
+        clientId: "client-one", qrTimeoutMs: 0
     }),
     puppeteer: {
         headless: true,
@@ -53,7 +45,10 @@ const client = new Client({
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
-            '--disable-gpu'
+            '--disable-gpu',
+            '--single-process', // Reduce drásticamente el consumo de RAM, ideal para VPS
+            '--disable-web-security',
+            '--disable-features=IsolateOrigins,site-per-process' // Evita que Chromium cree demasiados subprocesos
         ]
     }
 });
