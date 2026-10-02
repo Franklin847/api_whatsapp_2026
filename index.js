@@ -406,9 +406,19 @@ app.post('/enviar_documentos', async (req, res) => {
             }
 
             if (imagenBase64) {
-                // Volvemos a la forma original que tenías en la otra API:
-                let media = new MessageMedia('application/pdf', imagenBase64.replace(/^data:.*?;base64,/, ""), 'documento.pdf');
-                await client.sendMessage(chatId, media, { sendSeen: false });
+                // Al parecer la última actualización de whatsapp web falla al enviar base64 directamente en memoria
+                // o usando opciones extras como sendMediaAsDocument.
+                // Usaremos EXACTAMENTE el mismo método infalible de /enviar_mensaje:
+                const base64Data = imagenBase64.replace(/^data:.*?;base64,/, "");
+                const nombre_archivo = 'archivos/recibos/' + generarNombreArchivo(20) + '.pdf';
+                
+                try {
+                    fs.writeFileSync(nombre_archivo, base64Data, "base64");
+                    const media = MessageMedia.fromFilePath(nombre_archivo);
+                    await client.sendMessage(chatId, media); // <-- Exactamente igual que enviar_mensaje, sin opciones extra
+                } catch (err) {
+                    console.log("Error al enviar el pdf físico:", err);
+                }
             }
 
             res.json(
