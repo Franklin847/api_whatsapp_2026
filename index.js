@@ -406,17 +406,9 @@ app.post('/enviar_documentos', async (req, res) => {
             }
 
             if (imagenBase64) {
-                // Guardamos el archivo físicamente para evitar el error de memoize de whatsapp-web.js
-                const base64Data = imagenBase64.replace(/^data:.*?;base64,/, "");
-                const nombre_archivo = 'archivos/recibos/' + generarNombreArchivo(20) + '.pdf';
-                
-                try {
-                    fs.writeFileSync(nombre_archivo, base64Data, "base64");
-                    const media = MessageMedia.fromFilePath(nombre_archivo);
-                    await client.sendMessage(chatId, media, { sendMediaAsDocument: true });
-                } catch (err) {
-                    console.log("Error al procesar y enviar el documento:", err);
-                }
+                // Volvemos a la forma original que tenías en la otra API:
+                let media = new MessageMedia('application/pdf', imagenBase64.replace(/^data:.*?;base64,/, ""), 'documento.pdf');
+                await client.sendMessage(chatId, media, { sendSeen: false });
             }
 
             res.json(
