@@ -16,13 +16,24 @@ const app = express();
 // --------------------------------------------------------
 // Prevencion de Caidas del Servidor
 // --------------------------------------------------------
-// Evitar que el proceso de Node.js se cierre por errores no capturados
-process.on('uncaughtException', function (err) {
+process.on('uncaughtException', async function (err) {
     console.error('Se capturó un error inesperado (uncaughtException):', err);
+    if (String(err).includes('detached Frame') || String(err).includes('Target closed') || String(err).includes('Protocol error')) {
+        console.log('Reiniciando cliente de WhatsApp por error crítico (uncaughtException)...');
+        sesion_activa = 'N';
+        try { await client.destroy(); } catch (e) {}
+        client.initialize();
+    }
 });
 
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', async (reason, promise) => {
     console.error('Promesa no manejada (unhandledRejection):', promise, 'razón:', reason);
+    if (String(reason).includes('detached Frame') || String(reason).includes('Target closed') || String(reason).includes('Protocol error')) {
+        console.log('Reiniciando cliente de WhatsApp por error crítico (unhandledRejection)...');
+        sesion_activa = 'N';
+        try { await client.destroy(); } catch (e) {}
+        client.initialize();
+    }
 });
 
 // --------------------------------------------------------
@@ -187,7 +198,7 @@ app.get('/cerrar_sesion', async (req, res) => {
 });
 
 // metodo post para enviar un mensjae con un archivo
-app.post('/enviar_mensaje', (req, res) => {
+app.post('/enviar_mensaje', async (req, res) => {
     numero_recibe = req.body['numero_recibe'];
     mensaje_recibe = req.body['mensaje'];
     archivo = req.body['archivo'];
@@ -223,7 +234,7 @@ app.post('/enviar_mensaje', (req, res) => {
             const chatId = number.substring(1) + "@c.us";
 
 
-            client.sendMessage(chatId, text);
+            await client.sendMessage(chatId, text);
 
             var nombre_archivo = '';
 
@@ -233,16 +244,13 @@ app.post('/enviar_mensaje', (req, res) => {
                 // binaryData = Buffer.from(base64Data, 'base64').toString('binary');
                 nombre_archivo = 'archivos/recibos/' + generarNombreArchivo(20) + '.pdf';
 
-                require("fs").writeFile(nombre_archivo, archivo, "base64", function (err) {
-                    if (err) {
-                        console.log(err); // writes out file without error, but it's not a valid image
-                    } else {
-                        const media = MessageMedia.fromFilePath(nombre_archivo)
-                        client.sendMessage(chatId, media);
-                    }
-                });
-
-
+                try {
+                    fs.writeFileSync(nombre_archivo, archivo, "base64");
+                    const media = MessageMedia.fromFilePath(nombre_archivo);
+                    await client.sendMessage(chatId, media);
+                } catch (err) {
+                    console.log("Error al procesar el archivo:", err);
+                }
             }
 
 
@@ -270,10 +278,16 @@ app.post('/enviar_mensaje', (req, res) => {
 
     } catch (error) {
         console.error(error);
+        if (String(error).includes('detached Frame') || String(error).includes('Target closed') || String(error).includes('Protocol error')) {
+            console.log('Reiniciando cliente de WhatsApp por error de frame en enviar_mensaje...');
+            sesion_activa = 'N';
+            try { await client.destroy(); } catch (e) {}
+            client.initialize();
+        }
         res.json(
             {
                 status: false,
-                data: error,
+                data: error.toString(),
                 mensaje: 'MENSAJE NO ENVIADO',
             }
         )  // <==== req.body will be a parsed JSON object
@@ -283,7 +297,7 @@ app.post('/enviar_mensaje', (req, res) => {
 })
 
 // metodo post para enviar un mensjae con un archivo
-app.post('/enviar_imagenes', (req, res) => {
+app.post('/enviar_imagenes', async (req, res) => {
     numero_recibe = req.body['numero_recibe'];
     mensaje_recibe = req.body['mensaje'];
     imagenBase64 = req.body['imagen'];
@@ -324,9 +338,9 @@ app.post('/enviar_imagenes', (req, res) => {
             const chatId = number.substring(1) + "@c.us";
 
 
-            client.sendMessage(chatId, text);
+            await client.sendMessage(chatId, text);
             const media = new MessageMedia('image/png', imagenBase64);
-            client.sendMessage(chatId, media);
+            await client.sendMessage(chatId, media);
 
 
 
@@ -354,10 +368,16 @@ app.post('/enviar_imagenes', (req, res) => {
 
     } catch (error) {
         console.error(error);
+        if (String(error).includes('detached Frame') || String(error).includes('Target closed') || String(error).includes('Protocol error')) {
+            console.log('Reiniciando cliente de WhatsApp por error de frame en enviar_imagenes...');
+            sesion_activa = 'N';
+            try { await client.destroy(); } catch (e) {}
+            client.initialize();
+        }
         res.json(
             {
                 status: false,
-                data: error,
+                data: error.toString(),
                 mensaje: 'MENSAJE NO ENVIADO',
             }
         )  // <==== req.body will be a parsed JSON object
