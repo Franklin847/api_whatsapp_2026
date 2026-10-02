@@ -21,7 +21,7 @@ process.on('uncaughtException', async function (err) {
     if (String(err).includes('detached Frame') || String(err).includes('Target closed') || String(err).includes('Protocol error')) {
         console.log('Reiniciando cliente de WhatsApp por error crítico (uncaughtException)...');
         sesion_activa = 'N';
-        try { await client.destroy(); } catch (e) {}
+        try { await client.destroy(); } catch (e) { }
         client.initialize();
     }
 });
@@ -31,7 +31,7 @@ process.on('unhandledRejection', async (reason, promise) => {
     if (String(reason).includes('detached Frame') || String(reason).includes('Target closed') || String(reason).includes('Protocol error')) {
         console.log('Reiniciando cliente de WhatsApp por error crítico (unhandledRejection)...');
         sesion_activa = 'N';
-        try { await client.destroy(); } catch (e) {}
+        try { await client.destroy(); } catch (e) { }
         client.initialize();
     }
 });
@@ -83,7 +83,7 @@ client.on("ready", () => {
 client.on('disconnected', async (msg) => {
     console.error('DESCONECTADO: ' + msg)
     sesion_activa = 'N';
-    
+
     // Cierra completamente el navegador anterior antes de abrir uno nuevo
     try {
         await client.destroy();
@@ -155,7 +155,7 @@ app.get('/verificar_sesion', (req, res) => {
 app.get('/cerrar_sesion', async (req, res) => {
     try {
         console.log('Cerrando sesión y destruyendo cliente...');
-        
+
         // Destruir el cliente para cerrar los navegadores de chromium
         try {
             await client.destroy();
@@ -172,7 +172,7 @@ app.get('/cerrar_sesion', async (req, res) => {
             fs.rmSync(pathAuth, { recursive: true, force: true });
             console.log('Carpeta .wwebjs_auth eliminada.');
         }
-        
+
         if (fs.existsSync(pathCache)) {
             fs.rmSync(pathCache, { recursive: true, force: true });
             console.log('Carpeta .wwebjs_cache eliminada.');
@@ -281,7 +281,7 @@ app.post('/enviar_mensaje', async (req, res) => {
         if (String(error).includes('detached Frame') || String(error).includes('Target closed') || String(error).includes('Protocol error')) {
             console.log('Reiniciando cliente de WhatsApp por error de frame en enviar_mensaje...');
             sesion_activa = 'N';
-            try { await client.destroy(); } catch (e) {}
+            try { await client.destroy(); } catch (e) { }
             client.initialize();
         }
         res.json(
@@ -371,7 +371,7 @@ app.post('/enviar_imagenes', async (req, res) => {
         if (String(error).includes('detached Frame') || String(error).includes('Target closed') || String(error).includes('Protocol error')) {
             console.log('Reiniciando cliente de WhatsApp por error de frame en enviar_imagenes...');
             sesion_activa = 'N';
-            try { await client.destroy(); } catch (e) {}
+            try { await client.destroy(); } catch (e) { }
             client.initialize();
         }
         res.json(
@@ -385,6 +385,68 @@ app.post('/enviar_imagenes', async (req, res) => {
 
 
 })
+
+
+
+
+// 5. Enviar Documentos
+app.post('/enviar_documentos', async (req, res) => {
+    numero_recibe = req.body['numero_recibe'];
+    mensaje_recibe = req.body['mensaje'];
+    imagenBase64 = req.body['imagen']; // 'imagen' era el nombre del campo pdf en el original
+
+    try {
+        if (sesion_activa == 'S') {
+            const number = "+593" + numero_recibe;
+            const text = mensaje_recibe;
+            const chatId = number.substring(1) + "@c.us";
+
+            if (text) {
+                await client.sendMessage(chatId, text);
+            }
+
+            if (imagenBase64) {
+                // Asumimos PDF por defecto como estaba antes
+                let media = new MessageMedia('application/pdf', imagenBase64.replace(/^data:.*?;base64,/, ""), 'documento.pdf');
+                await client.sendMessage(chatId, media);
+            }
+
+            res.json(
+                {
+                    status: true,
+                    data: text,
+                    mensaje: 'DOCUMENTO ENVIADO',
+                    nombre_archivo: 'DOCUMENTO'
+                }
+            );
+
+        } else {
+            res.json(
+                {
+                    status: false,
+                    data: sesion_activa,
+                    mensaje: 'SESION INACTIVA'
+                }
+            );
+        }
+
+    } catch (error) {
+        console.error(error);
+        if (String(error).includes('detached Frame') || String(error).includes('Target closed') || String(error).includes('Protocol error')) {
+            console.log('Reiniciando cliente de WhatsApp por error de frame en enviar_documentos...');
+            sesion_activa = 'N';
+            try { await client.destroy(); } catch (e) { }
+            client.initialize();
+        }
+        res.json(
+            {
+                status: false,
+                data: error.toString(),
+                mensaje: 'DOCUMENTO NO ENVIADO',
+            }
+        );
+    }
+});
 
 // Configuramos el puerto que queremos que escuche nuestro servidor express
 app.listen(process.env.PUERTO_EXPRESS, '0.0.0.0', () => {
